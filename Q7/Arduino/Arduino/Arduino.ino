@@ -1,4 +1,4 @@
-int ledPin = D1; // digital pin D1 
+داint ledPin = D1; // digital pin D1 
 int ldrPin = A0; // analog pin A0
 void setup() { 
   Serial.begin(115200);
