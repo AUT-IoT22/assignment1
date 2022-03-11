@@ -16,9 +16,12 @@ const uint8_t LDR_PIN = A0;
 
 const unsigned int LDR_TRIGGER_LEVEL = 700;
 
+const unsigned int ALLOWED_TIME = 10;
+const unsigned int CLASS_TIME = 15;
+
 // Network credentials
-const char *ssid     = "RADIN-PC 0950";
-const char *password = "f:67W589";
+const char *ssid     = "RADIN-L";
+const char *password = "radinradin";
 
 MFRC522 rfid(RFID_SS_PIN, RFID_RST_PIN); // Instance of the class
 MFRC522::MIFARE_Key key;
@@ -31,6 +34,9 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 String tag;
 byte servoDeg = 0;
+long epochTime = 0;
+bool classRunning = false;
+long classStartEpochTime = 0;
 
 // ===================================================================
 
@@ -56,19 +62,40 @@ void setup() {
 }
 
 void loop() {
-  if (isLdrTriggered()) {
-    blinkLed3s();
+  
+  if (!classRunning) {
+    if (isLdrTriggered()) {  // starting class...
+      classStartEpochTime = getEpochTime();
+      classRunning = true;
+      Serial.printf("Class started at epoch time: %ld\n", classStartEpochTime);
+      buzz1s();
+    }
+    return;
   }
+
+  // Class is running at this point
+
+  epochTime = getEpochTime();
+  
+  if (epochTime > classStartEpochTime+CLASS_TIME) {  // stopping class...
+    classRunning = false;
+    Serial.printf("Class ended at epoch time: %ld\n", epochTime);
+    // TODO: PRINT STUDENTS LIST
+    buzz1s();
+    return;
+  }
+  
   tag = readCard();
   if (tag != "") {  // Card is hold on reader
-    Serial.println(tag);
-    time_t epochTime = timeClient.getEpochTime();
-    Serial.print("Epoch Time: ");
-    Serial.println(epochTime);
-    openDoor();
-    blinkLed3s();
-//    buzz1s();
-    closeDoor();
+    Serial.printf("Tag ID: %s\n", tag);
+    
+    if (epochTime < classStartEpochTime+ALLOWED_TIME) {  // Enter is allowed
+      openDoor();
+      blinkLed3s();
+      closeDoor();
+    } else {
+      buzz1s();
+    }   
   }
 }
 // ===================================================================
@@ -132,4 +159,9 @@ void connectToWifi() {
     Serial.print(".");
   }
   Serial.println("\nConnedted.");
+}
+
+long getEpochTime() {
+  timeClient.update();
+  return timeClient.getEpochTime();
 }
