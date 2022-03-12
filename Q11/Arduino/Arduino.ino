@@ -6,6 +6,8 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
+#define CLASS_SIZE 2
+
 constexpr uint8_t RFID_RST_PIN = D3;     // Configurable, see typical pin layout above
 constexpr uint8_t RFID_SS_PIN = D4;     // Configurable, see typical pin layout above
 
@@ -32,6 +34,10 @@ Servo servo;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
+String names[] = {"Mohammaderfan Ghasemi", "Radin Shayanfar"};
+String tags[] = {"1795490155", "1627116127"};
+bool aList[CLASS_SIZE] = {0};
+
 String tag;
 byte servoDeg = 0;
 long epochTime = 0;
@@ -42,6 +48,7 @@ long classStartEpochTime = 0;
 
 void setup() {
   Serial.begin(9600);
+  
   SPI.begin(); // Init SPI bus
   rfid.PCD_Init(); // Init MFRC522
 
@@ -59,6 +66,7 @@ void setup() {
 
   // Initialize a NTPClient to get time
   timeClient.begin();
+  timeClient.update();
 }
 
 void loop() {
@@ -80,7 +88,8 @@ void loop() {
   if (epochTime > classStartEpochTime+CLASS_TIME) {  // stopping class...
     classRunning = false;
     Serial.printf("Class ended at epoch time: %ld\n", epochTime);
-    // TODO: PRINT STUDENTS LIST
+    printAbsents();
+    newAList();
     buzz1s();
     return;
   }
@@ -90,6 +99,9 @@ void loop() {
     Serial.printf("Tag ID: %s\n", tag);
     
     if (epochTime < classStartEpochTime+ALLOWED_TIME) {  // Enter is allowed
+      Serial.printf("%Tag ID %s entered the class.\n", tag );
+      rollStudent(tag);
+
       openDoor();
       blinkLed3s();
       closeDoor();
@@ -162,6 +174,37 @@ void connectToWifi() {
 }
 
 long getEpochTime() {
-  timeClient.update();
   return timeClient.getEpochTime();
+}
+
+void printAbsents() {
+  Serial.println("=== Absents ===");
+  for (int i = 0; i < CLASS_SIZE; i++) {
+    if (! aList[i]) {
+      Serial.println(names[i]);
+    }
+  }
+}
+
+int tIndex = -1;
+void rollStudent(String tag) {
+  tIndex = searchArray(tags, tag);
+  if (tIndex >= 0) {
+    aList[tIndex] = true;
+  }
+}
+
+void newAList() {
+  for (int i = 0; i < CLASS_SIZE; i++) {
+    aList[i] = false;
+  }
+}
+
+int searchArray(String arr[], String s) {
+  for (int i = 0; i < CLASS_SIZE; i++) {
+    if (arr[i] == s) {
+      return i;
+    }
+  }
+  return -1;
 }
